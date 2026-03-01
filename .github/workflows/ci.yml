@@ -59,6 +59,7 @@ jobs:
           sudo kubectl -n $K3S_NAMESPACE create secret generic hospital-secrets \
             --from-literal=mongodb_uri="${{ secrets.MONGODB_URI }}" \
             --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --from-literal=REFRESH_SECRET="${{ secrets.REFRESH_SECRET }}" \
             --dry-run=client -o yaml | sudo kubectl apply -f -
 
       - name: Deploy Backend
