@@ -4,11 +4,10 @@ metadata:
   name: hospital-backend
   namespace: num
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: hospital-backend
   ports:
   - protocol: TCP
     port: 8000
     targetPort: 8000
-    nodePort: 31000
