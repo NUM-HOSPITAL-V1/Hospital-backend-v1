@@ -6,7 +6,7 @@ import {
   updateMedicalStaffById,
   deleteMedicalStaffById
 } from "../../infrastructure/repositories/medicalStaffRepository.js";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 
 export const createMedicalStaffUseCases = () => {
   const listStaff = async (filters = {}) => {

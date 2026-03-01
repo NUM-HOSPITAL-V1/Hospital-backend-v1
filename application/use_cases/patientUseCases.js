@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { createError } from "../../utils/error.js";
 import {
   listAllPatients, 
