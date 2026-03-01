@@ -54,10 +54,11 @@ jobs:
         run: |
           sudo kubectl create namespace $K3S_NAMESPACE --dry-run=client -o yaml | sudo kubectl apply -f -
 
-      - name: Create Mongo Secret
+      - name: Create/Update hospital-secrets (Mongo + JWT)
         run: |
           sudo kubectl -n $K3S_NAMESPACE create secret generic hospital-secrets \
             --from-literal=mongodb_uri="${{ secrets.MONGODB_URI }}" \
+            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             --dry-run=client -o yaml | sudo kubectl apply -f -
 
       - name: Deploy Backend
@@ -70,3 +71,6 @@ jobs:
           sudo kubectl rollout status deployment/hospital-backend -n $K3S_NAMESPACE
           sudo kubectl get pods -n $K3S_NAMESPACE
           sudo kubectl get svc -n $K3S_NAMESPACE
+
+
+            

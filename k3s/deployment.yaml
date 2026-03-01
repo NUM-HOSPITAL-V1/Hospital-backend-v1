@@ -14,20 +14,25 @@ spec:
         app: hospital-backend
     spec:
       containers:
-      - name: hospital-backend
-        image: nurlannn/hospital-backend:latest
-        ports:
-        - containerPort: 8000   
-        env:
-        - name: MONGO_URI
-          valueFrom:
-            secretKeyRef:
-              name: hospital-secrets
-              key: mongodb_uri
-        resources:
-          requests:
-            memory: "32Mi"
-            cpu: "100m"
-          limits:
-            memory: "100Mi"
-            cpu: "250m"
+        - name: hospital-backend
+          image: nurlannn/hospital-backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: hospital-secrets
+                  key: mongodb_uri
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hospital-secrets
+                  key: JWT_SECRET
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
