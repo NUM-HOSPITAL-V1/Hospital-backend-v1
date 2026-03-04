@@ -65,6 +65,20 @@ jobs:
         run: |
          helm version
 
+      - name: Upsert backend secret
+        run: |
+          cat <<EOF | sudo kubectl apply -n $K3S_NAMESPACE -f -
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: hospital-secrets
+          type: Opaque
+          stringData:
+            mongodb_uri: "${{ secrets.MONGODB_URI }}"
+            JWT_SECRET: "${{ secrets.JWT_SECRET }}"
+            REFRESH_SECRET: "${{ secrets.REFRESH_SECRET }}"
+          EOF
+
       - name: Deploy Backend (Helm)
         run: |
          helm upgrade --install hospital-backend ./charts/hospital-backend \
@@ -72,9 +86,8 @@ jobs:
             --create-namespace \
             --set image.repository=${{ secrets.DOCKER_USERNAME }}/hospital-backend \
             --set image.tag=latest \
-            --set secrets.mongodb_uri="${{ secrets.MONGODB_URI }}" \
-            --set secrets.JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            --set secrets.REFRESH_SECRET="${{ secrets.REFRESH_SECRET }}" \
+            --set secrets.create=false \
+            --set secrets.existingSecret=hospital-secrets \
             --wait --timeout 180s
 
       - name: Verify Deployment

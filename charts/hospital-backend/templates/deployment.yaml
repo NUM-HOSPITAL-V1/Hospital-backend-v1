@@ -1,5 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
+{{ $secretName := .Values.secrets.existingSecret | default .Values.secrets.name }}
 metadata:
   name: {{ include "hospital-backend.fullname" . }}
   labels:
@@ -27,17 +28,17 @@ spec:
             - name: MONGO_URI
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.name }}
+                  name: {{ $secretName }}
                   key: mongodb_uri
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.name }}
+                  name: {{ $secretName }}
                   key: JWT_SECRET
             - name: REFRESH_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.name }}
+                  name: {{ $secretName }}
                   key: REFRESH_SECRET
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

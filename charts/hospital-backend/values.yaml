@@ -31,6 +31,7 @@ resources:
 secrets:
   create: true
   name: hospital-secrets
+  existingSecret: ""
   mongodb_uri: ""
   JWT_SECRET: ""
   REFRESH_SECRET: ""
