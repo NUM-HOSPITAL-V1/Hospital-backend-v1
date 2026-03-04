@@ -79,6 +79,16 @@ jobs:
             REFRESH_SECRET: "${{ secrets.REFRESH_SECRET }}"
           EOF
 
+      - name: Adopt existing resources into Helm release
+        run: |
+          for kind in service deployment serviceaccount; do
+            if sudo kubectl get "$kind" hospital-backend -n "$K3S_NAMESPACE" >/dev/null 2>&1; then
+              sudo kubectl label "$kind" hospital-backend -n "$K3S_NAMESPACE" app.kubernetes.io/managed-by=Helm --overwrite
+              sudo kubectl annotate "$kind" hospital-backend -n "$K3S_NAMESPACE" meta.helm.sh/release-name=hospital-backend --overwrite
+              sudo kubectl annotate "$kind" hospital-backend -n "$K3S_NAMESPACE" meta.helm.sh/release-namespace="$K3S_NAMESPACE" --overwrite
+            fi
+          done
+
       - name: Deploy Backend (Helm)
         run: |
          helm upgrade --install hospital-backend ./charts/hospital-backend \
