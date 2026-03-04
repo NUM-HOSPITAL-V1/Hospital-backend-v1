@@ -11,7 +11,7 @@ npm install
 2. `env.example.txt` файлыг `.env` болго
 3. MongoDB Compass ашиглан баазтай холбогдох:
 
-   Compass дээр `mongodb+srv://test_user:tLS8nDi6Zje6dO7z@hospital-main.ai3vw.mongodb.net/` гэсэн connection string оруулж баазтай холбогдох
+   Compass дээр өөрийн `.env` доторх `MONGO_URI` connection string-ийг ашиглан баазтай холбогдоно.
 
 4. Доорх коммандаар ажиллуулах
 
@@ -53,19 +53,7 @@ project-root/
 1. Folder structure болон `auth.controller.js` гэх мэт stylistic choice-ыг сольж болно.
 2. helpers, validators нэмье гэж бодож байгаа (дараагаар). Мөн auth middleware бичнэ.
 
-## 5 TestUsers:
-Patient
-test6@gmail.com
-Test1234@
+## 5 Test Users
 
-Doctor
-jeandoe@gmail.com
-123456
-
-Nurse
-sumya@gmail.com
-123456
-
-Admin
-admin@ex.com
-Password123%
+Локал/тест орчинд шаардлагатай хэрэглэгчдээ seed script эсвэл админ endpoint-оор үүсгэж ашиглана.
+Бодит email/password эсвэл access credential-ийг README болон git commit-д хадгалахгүй.

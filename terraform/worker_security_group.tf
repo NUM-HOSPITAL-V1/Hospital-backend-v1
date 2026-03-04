@@ -6,10 +6,17 @@ resource "aws_security_group" "worker" {
   tags = var.worker_security_group_tags
 }
 
-resource "aws_vpc_security_group_ingress_rule" "worker" {
-  for_each = {
-    for idx, rule in var.worker_ingress_rules : idx => rule
+locals {
+  worker_ingress_rules_map = {
+    for rule in var.worker_ingress_rules : sha1(jsonencode(rule)) => rule
   }
+  worker_egress_rules_map = {
+    for rule in var.worker_egress_rules : sha1(jsonencode(rule)) => rule
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "worker" {
+  for_each = local.worker_ingress_rules_map
 
   security_group_id = aws_security_group.worker.id
   description       = try(each.value.description, null)
@@ -20,9 +27,7 @@ resource "aws_vpc_security_group_ingress_rule" "worker" {
 }
 
 resource "aws_vpc_security_group_egress_rule" "worker" {
-  for_each = {
-    for idx, rule in var.worker_egress_rules : idx => rule
-  }
+  for_each = local.worker_egress_rules_map
 
   security_group_id = aws_security_group.worker.id
   description       = try(each.value.description, null)

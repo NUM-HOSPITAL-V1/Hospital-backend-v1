@@ -6,10 +6,17 @@ resource "aws_security_group" "control" {
   tags = var.security_group_tags
 }
 
-resource "aws_vpc_security_group_ingress_rule" "control" {
-  for_each = {
-    for idx, rule in var.ingress_rules : idx => rule
+locals {
+  control_ingress_rules = {
+    for rule in var.ingress_rules : sha1(jsonencode(rule)) => rule
   }
+  control_egress_rules = {
+    for rule in var.egress_rules : sha1(jsonencode(rule)) => rule
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "control" {
+  for_each = local.control_ingress_rules
 
   security_group_id = aws_security_group.control.id
   description       = try(each.value.description, null)
@@ -20,9 +27,7 @@ resource "aws_vpc_security_group_ingress_rule" "control" {
 }
 
 resource "aws_vpc_security_group_egress_rule" "control" {
-  for_each = {
-    for idx, rule in var.egress_rules : idx => rule
-  }
+  for_each = local.control_egress_rules
 
   security_group_id = aws_security_group.control.id
   description       = try(each.value.description, null)
