@@ -24,4 +24,3 @@ jobs:
       # Хэрвээ тест байгаа бол:
       # - run: npm test
 
-      # - run: npm run build
