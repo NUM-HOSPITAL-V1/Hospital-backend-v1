@@ -1,4 +1,5 @@
 name: CI (Node.js Test)
+run-name: "CI | ${{ github.event_name }} | ${{ github.ref_name }}"
 
 on:
   push:
@@ -24,4 +25,3 @@ jobs:
 
       # Хэрвээ тест байгаа бол:
       # - run: npm test
-
