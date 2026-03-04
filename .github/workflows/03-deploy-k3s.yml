@@ -5,6 +5,8 @@ on:
     workflows: ["Build & Push Docker Image"]
     types: [completed]
     branches: [main]
+  pull_request:
+
 
 jobs:
   deploy:
