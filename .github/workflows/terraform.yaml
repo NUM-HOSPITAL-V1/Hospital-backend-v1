@@ -54,6 +54,8 @@ jobs:
       AWS_DEFAULT_REGION: eu-north-1
       TF_INPUT: "false"
       TF_VAR_vpc_id: ${{ secrets.AWS_VPC_ID }}
+      TF_VAR_egress_rules: "[]"
+      TF_VAR_worker_egress_rules: "[]"
 
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +63,47 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
 
       - run: terraform init -input=false
+        working-directory: terraform
+
+      - name: Import existing resources when present
+        working-directory: terraform
+        run: |
+          set -euo pipefail
+
+          CONTROL_SG_NAME="${TF_VAR_security_group_name:-control-node-sg}"
+          WORKER_SG_NAME="${TF_VAR_worker_security_group_name:-worker-node-sg}"
+          CONTROL_INSTANCE_NAME="${TF_VAR_instance_name:-control-node}"
+          WORKER_INSTANCE_NAME="${TF_VAR_worker_instance_name:-worker-node}"
+
+          control_sg_id="$(aws ec2 describe-security-groups \
+            --filters "Name=vpc-id,Values=${TF_VAR_vpc_id}" "Name=group-name,Values=${CONTROL_SG_NAME}" \
+            --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)"
+          if [ -n "${control_sg_id}" ] && [ "${control_sg_id}" != "None" ]; then
+            terraform import -input=false aws_security_group.control "${control_sg_id}" || true
+          fi
+
+          worker_sg_id="$(aws ec2 describe-security-groups \
+            --filters "Name=vpc-id,Values=${TF_VAR_vpc_id}" "Name=group-name,Values=${WORKER_SG_NAME}" \
+            --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)"
+          if [ -n "${worker_sg_id}" ] && [ "${worker_sg_id}" != "None" ]; then
+            terraform import -input=false aws_security_group.worker "${worker_sg_id}" || true
+          fi
+
+          control_instance_id="$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${CONTROL_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
+          if [ -n "${control_instance_id}" ] && [ "${control_instance_id}" != "None" ]; then
+            terraform import -input=false aws_instance.control "${control_instance_id}" || true
+          fi
+
+          worker_instance_id="$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${WORKER_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
+          if [ -n "${worker_instance_id}" ] && [ "${worker_instance_id}" != "None" ]; then
+            terraform import -input=false aws_instance.worker "${worker_instance_id}" || true
+          fi
+
+      - run: terraform plan -input=false -no-color
         working-directory: terraform
 
       - run: terraform apply -input=false -auto-approve

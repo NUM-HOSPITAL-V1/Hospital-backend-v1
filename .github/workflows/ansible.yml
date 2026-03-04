@@ -21,17 +21,26 @@ jobs:
           sudo apt update
           sudo apt install -y ansible
 
+      - name: Validate SSH secrets
+        run: |
+          test -n "${{ secrets.SERVER_HOST }}" || (echo "SERVER_HOST is empty" && exit 1)
+          test -n "${{ secrets.SERVER_USER }}" || (echo "SERVER_USER is empty" && exit 1)
+          test -n "${{ secrets.SERVER_SSH_KEY }}" || (echo "SERVER_SSH_KEY is empty" && exit 1)
+
       - name: Setup SSH key
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > "$HOME/.ssh/id_rsa"
+          chmod 600 "$HOME/.ssh/id_rsa"
+
+      - name: Add host key
+        run: |
+          ssh-keyscan -T 10 -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts"
 
       - name: Run Ansible
         run: |
           ansible-playbook \
             -i "${{ secrets.SERVER_HOST }}," \
             -u "${{ secrets.SERVER_USER }}" \
-            --private-key ~/.ssh/id_rsa \
+            --private-key "$HOME/.ssh/id_rsa" \
             ansible/install-k3s.yml
