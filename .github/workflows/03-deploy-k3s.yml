@@ -4,10 +4,13 @@ on:
   workflow_run:
     workflows: ["Build & Push Docker Image"]
     types: [completed]
+    branches: [main]
+  pull_request:
+
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: [self-hosted, Linux, X64]
 
     env:
@@ -63,7 +66,15 @@ jobs:
             --set image.tag=$IMAGE_TAG \
             --set secrets.create=false \
             --set secrets.existingSecret=hospital-secrets \
-            --wait --timeout 300s
+            --wait --timeout 600s
+
+      - name: Debug rollout on failure
+        if: ${{ failure() }}
+        run: |
+          sudo kubectl get pods -n $K3S_NAMESPACE -o wide
+          sudo kubectl describe deployment/$RELEASE_NAME -n $K3S_NAMESPACE
+          sudo kubectl describe pods -n $K3S_NAMESPACE
+          sudo kubectl get events -n $K3S_NAMESPACE --sort-by=.metadata.creationTimestamp | tail -n 100
 
       - name: Verify
         run: |
