@@ -1,7 +1,12 @@
 name: Ansible Setup
 
 on:
-  workflow_dispatch:
+    push:
+        branches: [main]
+        paths: 
+            - "ansible/**"
+            - ".github/workflows/ansible.yml"
+    workflow_dispatch:
 
 jobs:
   setup:
