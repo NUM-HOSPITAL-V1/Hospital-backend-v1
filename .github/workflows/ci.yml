@@ -44,6 +44,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Debug runner host
+        run: |
+          hostname
+          whoami
+          sudo helm version
+          kubectl version --client
+
       - name: Set up kubeconfig
         run: |
           mkdir -p $HOME/.kube
@@ -54,21 +61,25 @@ jobs:
         run: |
           sudo kubectl create namespace $K3S_NAMESPACE --dry-run=client -o yaml | sudo kubectl apply -f -
 
-      - name: Create/Update hospital-secrets (Mongo + JWT)
+      - name: Verify Helm
         run: |
-          sudo kubectl -n $K3S_NAMESPACE create secret generic hospital-secrets \
-            --from-literal=mongodb_uri="${{ secrets.MONGODB_URI }}" \
-            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            --from-literal=REFRESH_SECRET="${{ secrets.REFRESH_SECRET }}" \
-            --dry-run=client -o yaml | sudo kubectl apply -f -
+          sudo helm version
 
-      - name: Deploy Backend
+      - name: Deploy Backend (Helm)
         run: |
-          sudo kubectl apply -n $K3S_NAMESPACE -f k3s/deployment.yaml
-          sudo kubectl apply -n $K3S_NAMESPACE -f k3s/service.yaml
+          sudo helm upgrade --install hospital-backend ./charts/hospital-backend \
+            -n $K3S_NAMESPACE \
+            --create-namespace \
+            --set image.repository=${{ secrets.DOCKER_USERNAME }}/hospital-backend \
+            --set image.tag=latest \
+            --set secrets.mongodb_uri="${{ secrets.MONGODB_URI }}" \
+            --set secrets.JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --set secrets.REFRESH_SECRET="${{ secrets.REFRESH_SECRET }}" \
+            --wait --timeout 180s
 
       - name: Verify Deployment
         run: |
+          sudo helm status hospital-backend -n $K3S_NAMESPACE
           sudo kubectl rollout status deployment/hospital-backend -n $K3S_NAMESPACE
           sudo kubectl get pods -n $K3S_NAMESPACE
           sudo kubectl get svc -n $K3S_NAMESPACE

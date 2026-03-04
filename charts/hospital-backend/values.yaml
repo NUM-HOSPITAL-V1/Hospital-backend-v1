@@ -1,0 +1,36 @@
+replicaCount: 1
+
+image:
+  repository: hospital-backend
+  pullPolicy: IfNotPresent
+  tag: ""
+
+nameOverride: ""
+fullNameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+containerPort: 8000
+
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
+
+secrets:
+  create: true
+  name: hospital-secrets
+  mongodb_uri: ""
+  JWT_SECRET: ""
+  REFRESH_SECRET: ""
