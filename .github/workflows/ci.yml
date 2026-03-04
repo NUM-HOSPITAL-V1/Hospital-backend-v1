@@ -51,6 +51,12 @@ jobs:
           helm version
           sudo kubectl version --client
 
+      - name: Set up kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
       - name: Ensure namespace exists
         run: |
           sudo kubectl create namespace $K3S_NAMESPACE --dry-run=client -o yaml | sudo kubectl apply -f -
@@ -61,7 +67,7 @@ jobs:
 
       - name: Deploy Backend (Helm)
         run: |
-          helm upgrade --install hospital-backend ./charts/hospital-backend \
+         helm upgrade --install hospital-backend ./charts/hospital-backend \
             -n $K3S_NAMESPACE \
             --create-namespace \
             --set image.repository=${{ secrets.DOCKER_USERNAME }}/hospital-backend \
