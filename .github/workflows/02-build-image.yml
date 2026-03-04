@@ -3,12 +3,13 @@ name: Build & Push Docker Image
 on:
   push:
     branches: [ main ]
-  pull_request:
 
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment: production
+
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
 
