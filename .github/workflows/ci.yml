@@ -87,6 +87,12 @@ jobs:
             sudo kubectl delete serviceaccount hospital-backend -n "$K3S_NAMESPACE" --ignore-not-found=true
           fi
 
+      - name: Reset immutable deployment selector drift
+        run: |
+          if helm status hospital-backend -n "$K3S_NAMESPACE" >/dev/null 2>&1; then
+            sudo kubectl delete deployment hospital-backend -n "$K3S_NAMESPACE" --ignore-not-found=true
+          fi
+
       - name: Deploy Backend (Helm)
         run: |
          helm upgrade --install hospital-backend ./charts/hospital-backend \
