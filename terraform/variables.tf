@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "ami_id" {
   description = "AMI ID for the control node EC2 instance."
   type        = string
-  default     = "ami-001413555755c0cf7"
+  default     = "ami-0974a2c5ddf10f442"
 }
 
 variable "instance_type" {
@@ -83,7 +83,14 @@ variable "egress_rules" {
 variable "worker_ami_id" {
   description = "AMI ID for the worker node EC2 instance."
   type        = string
-  default     = null
+  default     = "ami-0974a2c5ddf10f442"
+}
+
+
+variable "worker2_ami_id" {
+  description = "AMI ID for the worker node EC2 instance."
+  type        = string
+  default     = "ami-0974a2c5ddf10f442"
 }
 
 variable "worker_instance_type" {
@@ -102,6 +109,12 @@ variable "worker_instance_name" {
   description = "Name tag for the worker EC2 instance."
   type        = string
   default     = "worker-node"
+}
+
+variable "worker2_instance_name" {
+  description = "Name tag for the worker EC2 instance."
+  type        = string
+  default     = "extra-worker"
 }
 
 variable "worker_security_group_name" {
