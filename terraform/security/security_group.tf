@@ -9,6 +9,7 @@ resource "aws_security_group" "control" {
 resource "aws_vpc_security_group_ingress_rule" "control" {
   for_each = {
     for idx, rule in var.ingress_rules : idx => rule
+    if var.manage_ingress_rules
   }
 
   security_group_id = aws_security_group.control.id
@@ -43,6 +44,7 @@ resource "aws_security_group" "worker" {
 resource "aws_vpc_security_group_ingress_rule" "worker" {
   for_each = {
     for idx, rule in var.worker_ingress_rules : idx => rule
+    if var.manage_ingress_rules
   }
 
   security_group_id = aws_security_group.worker.id
