@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   setup:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     environment: production
     timeout-minutes: 20
     steps:
@@ -38,7 +38,10 @@ jobs:
       - name: Add host key
         run: |
           set -euo pipefail
-          ssh-keyscan -T 10 -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts"
+          if ! ssh-keyscan -T 10 -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts" 2>/dev/null; then
+            echo "ssh-keyscan failed. Check SERVER_HOST reachability from the runner and port 22 firewall rules."
+            exit 1
+          fi
           chmod 600 "$HOME/.ssh/known_hosts"
 
       - name: Create inventory
