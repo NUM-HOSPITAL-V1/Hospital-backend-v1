@@ -19,9 +19,6 @@ jobs:
           cache: "npm"
 
       - run: npm ci
-
-      # Хэрвээ lint байгаа бол:
-      # - run: npm run lint
-
+      
       # Хэрвээ тест байгаа бол:
       # - run: npm test
