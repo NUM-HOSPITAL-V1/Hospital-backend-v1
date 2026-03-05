@@ -31,8 +31,6 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: eu-north-1
       TF_INPUT: "false"
-      TF_VAR_vpc_id: ${{ secrets.AWS_VPC_ID }}
-      TF_VAR_manage_ingress_rules: "false"
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
       TF_STATE_KEY: hospital-backend/terraform.tfstate
       TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
@@ -57,7 +55,11 @@ jobs:
             -backend-config="encrypt=true"
         working-directory: terraform
 
-      - run: terraform plan -input=false -no-color
+      - name: Validate tfvars file
+        run: test -f terraform.tfvars || (echo "terraform/terraform.tfvars is missing" && exit 1)
+        working-directory: terraform
+
+      - run: terraform plan -input=false -no-color -var-file=terraform.tfvars
         working-directory: terraform
 
 
@@ -70,16 +72,6 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: eu-north-1
       TF_INPUT: "false"
-      TF_VAR_vpc_id: ${{ secrets.AWS_VPC_ID }}
-      TF_VAR_manage_ingress_rules: "false"
-      TF_VAR_ami_id: "ami-0974a2c5ddf10f442"
-      TF_VAR_worker_ami_id: "ami-0974a2c5ddf10f442"
-      TF_VAR_key_name: ${{ secrets.AWS_KEY_PAIR_NAME }}
-      TF_VAR_worker_key_name: ${{ secrets.AWS_WORKER_KEY_PAIR_NAME }}
-      TF_VAR_ingress_rules: ${{ secrets.AWS_INGRESS_RULES_JSON }}
-      TF_VAR_worker_ingress_rules: ${{ secrets.AWS_WORKER_INGRESS_RULES_JSON }}
-      TF_VAR_egress_rules: "[]"
-      TF_VAR_worker_egress_rules: "[]"
       TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
       TF_STATE_KEY: hospital-backend/terraform.tfstate
       TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
@@ -104,114 +96,12 @@ jobs:
             -backend-config="encrypt=true"
         working-directory: terraform
 
-      - name: Validate key pairs
-        run: |
-          test -n "${TF_VAR_key_name}" || (echo "AWS_KEY_PAIR_NAME secret is empty" && exit 1)
-          test -n "${TF_VAR_worker_key_name}" || (echo "AWS_WORKER_KEY_PAIR_NAME secret is empty" && exit 1)
-          aws ec2 describe-key-pairs --key-names "${TF_VAR_key_name}" --region "${AWS_DEFAULT_REGION}" >/dev/null
-          aws ec2 describe-key-pairs --key-names "${TF_VAR_worker_key_name}" --region "${AWS_DEFAULT_REGION}" >/dev/null
-
-      - name: Validate ingress rules
-        run: |
-          test -n "${TF_VAR_ingress_rules}" || (echo "AWS_INGRESS_RULES_JSON secret is empty" && exit 1)
-          test -n "${TF_VAR_worker_ingress_rules}" || (echo "AWS_WORKER_INGRESS_RULES_JSON secret is empty" && exit 1)
-
-      - name: Import existing resources when present
-        working-directory: terraform
-        run: |
-          set -euo pipefail
-
-          CONTROL_SG_NAME="${TF_VAR_security_group_name:-control-node-sg}"
-          WORKER_SG_NAME="${TF_VAR_worker_security_group_name:-worker-node-sg}"
-          CONTROL_INSTANCE_NAME="${TF_VAR_instance_name:-control-node}"
-          WORKER_INSTANCE_NAME="${TF_VAR_worker_instance_name:-worker-node}"
-          WORKER2_INSTANCE_NAME="${TF_VAR_worker2_instance_name:-extra-worker}"
-
-          control_sg_id="$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=${TF_VAR_vpc_id}" "Name=group-name,Values=${CONTROL_SG_NAME}" \
-            --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)"
-          if [ -n "${control_sg_id}" ] && [ "${control_sg_id}" != "None" ]; then
-            terraform import -input=false module.security.aws_security_group.control "${control_sg_id}" || true
-          fi
-
-          worker_sg_id="$(aws ec2 describe-security-groups \
-            --filters "Name=vpc-id,Values=${TF_VAR_vpc_id}" "Name=group-name,Values=${WORKER_SG_NAME}" \
-            --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)"
-          if [ -n "${worker_sg_id}" ] && [ "${worker_sg_id}" != "None" ]; then
-            terraform import -input=false module.security.aws_security_group.worker "${worker_sg_id}" || true
-          fi
-
-          control_instance_id="$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${CONTROL_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
-            --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
-          if [ -n "${control_instance_id}" ] && [ "${control_instance_id}" != "None" ]; then
-            terraform import -input=false module.compute.aws_instance.control "${control_instance_id}" || true
-          fi
-
-          worker_instance_id="$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${WORKER_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
-            --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
-          if [ -n "${worker_instance_id}" ] && [ "${worker_instance_id}" != "None" ]; then
-            terraform import -input=false module.compute.aws_instance.worker "${worker_instance_id}" || true
-          fi
-
-          worker2_instance_id="$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=${WORKER2_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
-            --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
-          if [ -n "${worker2_instance_id}" ] && [ "${worker2_instance_id}" != "None" ]; then
-            terraform import -input=false module.compute.aws_instance.worker2 "${worker2_instance_id}" || true
-          fi
-
-          import_existing_ingress_rules() {
-            local sg_id="$1"
-            local desired_rules_json="$2"
-            local tf_address_prefix="$3"
-
-            if [ "${TF_VAR_manage_ingress_rules:-true}" != "true" ]; then
-              echo "Skipping ingress import for ${tf_address_prefix} because TF_VAR_manage_ingress_rules=${TF_VAR_manage_ingress_rules:-unset}"
-              return 0
-            fi
-
-            if [ -z "${sg_id}" ] || [ "${sg_id}" = "None" ] || [ -z "${desired_rules_json}" ]; then
-              return 0
-            fi
-
-            local existing_rules_json
-            existing_rules_json="$(aws ec2 describe-security-group-rules \
-              --filters "Name=group-id,Values=${sg_id}" "Name=is-egress,Values=false" \
-              --query "SecurityGroupRules[]" \
-              --output json 2>/dev/null || echo "[]")"
-
-            echo "${desired_rules_json}" | jq -c 'to_entries[]' | while read -r entry; do
-              idx="$(echo "${entry}" | jq -r '.key')"
-              proto="$(echo "${entry}" | jq -r '.value.protocol | ascii_downcase')"
-              cidr="$(echo "${entry}" | jq -r '.value.cidr_ipv4')"
-              from_port="$(echo "${entry}" | jq -r '(.value.from_port // -1)')"
-              to_port="$(echo "${entry}" | jq -r '(.value.to_port // -1)')"
-
-              rule_id="$(echo "${existing_rules_json}" | jq -r \
-                --arg proto "${proto}" \
-                --arg cidr "${cidr}" \
-                --argjson from "${from_port}" \
-                --argjson to "${to_port}" \
-                '.[] | select(
-                  ((.IpProtocol | ascii_downcase) == $proto) and
-                  (.CidrIpv4 // "") == $cidr and
-                  ((.FromPort // -1) == $from) and
-                  ((.ToPort // -1) == $to)
-                ) | .SecurityGroupRuleId' | head -n1)"
-
-              if [ -n "${rule_id}" ] && [ "${rule_id}" != "null" ]; then
-                terraform import -input=false "${tf_address_prefix}[\"${idx}\"]" "${rule_id}" || true
-              fi
-            done
-          }
-
-          import_existing_ingress_rules "${control_sg_id}" "${TF_VAR_ingress_rules}" "module.security.aws_vpc_security_group_ingress_rule.control"
-          import_existing_ingress_rules "${worker_sg_id}" "${TF_VAR_worker_ingress_rules}" "module.security.aws_vpc_security_group_ingress_rule.worker"
-
-      - run: terraform plan -input=false -no-color
+      - name: Validate tfvars file
+        run: test -f terraform.tfvars || (echo "terraform/terraform.tfvars is missing" && exit 1)
         working-directory: terraform
 
-      - run: terraform apply -input=false -auto-approve
+      - run: terraform plan -input=false -no-color -var-file=terraform.tfvars
+        working-directory: terraform
+
+      - run: terraform apply -input=false -auto-approve -var-file=terraform.tfvars
         working-directory: terraform
