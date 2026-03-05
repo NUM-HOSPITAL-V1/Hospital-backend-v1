@@ -31,10 +31,24 @@ jobs:
           sudo kubectl version --client
 
       - name: Set up kubeconfig
+        env:
+          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG }}
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
+          set -euo pipefail
+          mkdir -p "$HOME/.kube"
+
+          if [ -n "${KUBECONFIG_CONTENT:-}" ]; then
+            printf '%s\n' "${KUBECONFIG_CONTENT}" | tr -d '\r' > "$HOME/.kube/config"
+          fi
+
+          if ! kubectl --kubeconfig "$HOME/.kube/config" version --client >/dev/null 2>&1; then
+            echo "Provided KUBECONFIG is missing/invalid. Falling back to /etc/rancher/k3s/k3s.yaml"
+            sudo cp /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
+            sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
+          fi
+
+          chmod 600 "$HOME/.kube/config"
+          kubectl --kubeconfig "$HOME/.kube/config" cluster-info
 
       - name: Ensure namespace exists
         run: |
@@ -72,10 +86,11 @@ jobs:
       - name: Debug rollout on failure
         if: ${{ failure() }}
         run: |
-          sudo kubectl get pods -n $K3S_NAMESPACE -o wide
-          sudo kubectl describe deployment/$RELEASE_NAME -n $K3S_NAMESPACE
-          sudo kubectl describe pods -n $K3S_NAMESPACE
-          sudo kubectl get events -n $K3S_NAMESPACE --sort-by=.metadata.creationTimestamp | tail -n 100
+          set +e
+          sudo kubectl get pods -n "$K3S_NAMESPACE" -o wide
+          sudo kubectl describe deployment/"$RELEASE_NAME" -n "$K3S_NAMESPACE"
+          sudo kubectl describe pods -n "$K3S_NAMESPACE"
+          sudo kubectl get events -n "$K3S_NAMESPACE" --sort-by=.metadata.creationTimestamp | tail -n 100
 
       - name: Verify
         run: |

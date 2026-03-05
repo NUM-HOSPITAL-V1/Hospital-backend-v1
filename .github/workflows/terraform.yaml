@@ -92,33 +92,41 @@ jobs:
           WORKER_SG_NAME="${TF_VAR_worker_security_group_name:-worker-node-sg}"
           CONTROL_INSTANCE_NAME="${TF_VAR_instance_name:-control-node}"
           WORKER_INSTANCE_NAME="${TF_VAR_worker_instance_name:-worker-node}"
+          WORKER2_INSTANCE_NAME="${TF_VAR_worker2_instance_name:-extra-worker}"
 
           control_sg_id="$(aws ec2 describe-security-groups \
             --filters "Name=vpc-id,Values=${TF_VAR_vpc_id}" "Name=group-name,Values=${CONTROL_SG_NAME}" \
             --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)"
           if [ -n "${control_sg_id}" ] && [ "${control_sg_id}" != "None" ]; then
-            terraform import -input=false aws_security_group.control "${control_sg_id}" || true
+            terraform import -input=false module.security.aws_security_group.control "${control_sg_id}" || true
           fi
 
           worker_sg_id="$(aws ec2 describe-security-groups \
             --filters "Name=vpc-id,Values=${TF_VAR_vpc_id}" "Name=group-name,Values=${WORKER_SG_NAME}" \
             --query "SecurityGroups[0].GroupId" --output text 2>/dev/null || true)"
           if [ -n "${worker_sg_id}" ] && [ "${worker_sg_id}" != "None" ]; then
-            terraform import -input=false aws_security_group.worker "${worker_sg_id}" || true
+            terraform import -input=false module.security.aws_security_group.worker "${worker_sg_id}" || true
           fi
 
           control_instance_id="$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=${CONTROL_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
             --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
           if [ -n "${control_instance_id}" ] && [ "${control_instance_id}" != "None" ]; then
-            terraform import -input=false aws_instance.control "${control_instance_id}" || true
+            terraform import -input=false module.compute.aws_instance.control "${control_instance_id}" || true
           fi
 
           worker_instance_id="$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=${WORKER_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
             --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
           if [ -n "${worker_instance_id}" ] && [ "${worker_instance_id}" != "None" ]; then
-            terraform import -input=false aws_instance.worker "${worker_instance_id}" || true
+            terraform import -input=false module.compute.aws_instance.worker "${worker_instance_id}" || true
+          fi
+
+          worker2_instance_id="$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=${WORKER2_INSTANCE_NAME}" "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+            --query "Reservations[].Instances[].InstanceId | [0]" --output text 2>/dev/null || true)"
+          if [ -n "${worker2_instance_id}" ] && [ "${worker2_instance_id}" != "None" ]; then
+            terraform import -input=false module.compute.aws_instance.worker2 "${worker2_instance_id}" || true
           fi
 
       - run: terraform plan -input=false -no-color
