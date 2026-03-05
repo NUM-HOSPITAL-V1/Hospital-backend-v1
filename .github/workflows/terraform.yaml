@@ -32,13 +32,29 @@ jobs:
       AWS_DEFAULT_REGION: eu-north-1
       TF_INPUT: "false"
       TF_VAR_vpc_id: ${{ secrets.AWS_VPC_ID }}
+      TF_VAR_manage_ingress_rules: "false"
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      TF_STATE_KEY: hospital-backend/terraform.tfstate
+      TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
 
-      - run: terraform init -input=false
+      - name: Validate backend config
+        run: |
+          set -euo pipefail
+          test -n "${TF_STATE_BUCKET}" || (echo "TF_STATE_BUCKET secret is empty" && exit 1)
+          test -n "${TF_STATE_LOCK_TABLE}" || (echo "TF_STATE_LOCK_TABLE secret is empty" && exit 1)
+
+      - run: |
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_DEFAULT_REGION}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
+            -backend-config="encrypt=true"
         working-directory: terraform
 
       - run: terraform plan -input=false -no-color
@@ -55,6 +71,7 @@ jobs:
       AWS_DEFAULT_REGION: eu-north-1
       TF_INPUT: "false"
       TF_VAR_vpc_id: ${{ secrets.AWS_VPC_ID }}
+      TF_VAR_manage_ingress_rules: "false"
       TF_VAR_ami_id: "ami-0974a2c5ddf10f442"
       TF_VAR_worker_ami_id: "ami-0974a2c5ddf10f442"
       TF_VAR_key_name: ${{ secrets.AWS_KEY_PAIR_NAME }}
@@ -63,13 +80,28 @@ jobs:
       TF_VAR_worker_ingress_rules: ${{ secrets.AWS_WORKER_INGRESS_RULES_JSON }}
       TF_VAR_egress_rules: "[]"
       TF_VAR_worker_egress_rules: "[]"
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      TF_STATE_KEY: hospital-backend/terraform.tfstate
+      TF_STATE_LOCK_TABLE: ${{ secrets.TF_STATE_LOCK_TABLE }}
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: hashicorp/setup-terraform@v3
 
-      - run: terraform init -input=false
+      - name: Validate backend config
+        run: |
+          set -euo pipefail
+          test -n "${TF_STATE_BUCKET}" || (echo "TF_STATE_BUCKET secret is empty" && exit 1)
+          test -n "${TF_STATE_LOCK_TABLE}" || (echo "TF_STATE_LOCK_TABLE secret is empty" && exit 1)
+
+      - run: |
+          terraform init -input=false -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${AWS_DEFAULT_REGION}" \
+            -backend-config="dynamodb_table=${TF_STATE_LOCK_TABLE}" \
+            -backend-config="encrypt=true"
         working-directory: terraform
 
       - name: Validate key pairs
@@ -135,6 +167,11 @@ jobs:
             local desired_rules_json="$2"
             local tf_address_prefix="$3"
 
+            if [ "${TF_VAR_manage_ingress_rules:-true}" != "true" ]; then
+              echo "Skipping ingress import for ${tf_address_prefix} because TF_VAR_manage_ingress_rules=${TF_VAR_manage_ingress_rules:-unset}"
+              return 0
+            fi
+
             if [ -z "${sg_id}" ] || [ "${sg_id}" = "None" ] || [ -z "${desired_rules_json}" ]; then
               return 0
             fi
@@ -147,7 +184,7 @@ jobs:
 
             echo "${desired_rules_json}" | jq -c 'to_entries[]' | while read -r entry; do
               idx="$(echo "${entry}" | jq -r '.key')"
-              proto="$(echo "${entry}" | jq -r '.value.protocol')"
+              proto="$(echo "${entry}" | jq -r '.value.protocol | ascii_downcase')"
               cidr="$(echo "${entry}" | jq -r '.value.cidr_ipv4')"
               from_port="$(echo "${entry}" | jq -r '(.value.from_port // -1)')"
               to_port="$(echo "${entry}" | jq -r '(.value.to_port // -1)')"
@@ -158,7 +195,7 @@ jobs:
                 --argjson from "${from_port}" \
                 --argjson to "${to_port}" \
                 '.[] | select(
-                  .IpProtocol == $proto and
+                  ((.IpProtocol | ascii_downcase) == $proto) and
                   (.CidrIpv4 // "") == $cidr and
                   ((.FromPort // -1) == $from) and
                   ((.ToPort // -1) == $to)
