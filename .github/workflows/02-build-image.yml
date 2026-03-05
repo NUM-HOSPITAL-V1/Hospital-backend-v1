@@ -4,6 +4,9 @@ run-name: "Build Image | ${{ github.ref_name }} | ${{ github.sha }}"
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - "terraform/**"
+      - ".github/workflows/terraform.yaml"
 
 
 jobs:
