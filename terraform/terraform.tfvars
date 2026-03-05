@@ -10,7 +10,8 @@ vpc_id                     = "vpc-0800002d15fc879c7"
 
 ingress_rules = [
   { from_port = 22, to_port = 22, protocol = "tcp", cidr_ipv4 = "0.0.0.0/0" },
-  { from_port = 6443, to_port = 6443, protocol = "tcp", cidr_ipv4 = "0.0.0.0/0" }
+  { from_port = 6443, to_port = 6443, protocol = "tcp", cidr_ipv4 = "0.0.0.0/0" },
+  { from_port = 3000, to_port = 3003, protocol = "tcp", cidr_ipv4 = "0.0.0.0/0" }
 
 ]
 
