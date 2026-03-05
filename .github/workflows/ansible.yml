@@ -2,40 +2,57 @@ name: Ansible Setup
 run-name: "Ansible | ${{ github.event_name }} | ${{ github.ref_name }}"
 
 on:
-    workflow_dispatch:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   setup:
     runs-on: ubuntu-latest
     environment: production
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - name: Install ansible
         run: |
+          set -euo pipefail
           sudo apt update
           sudo apt install -y ansible
 
       - name: Validate SSH secrets
         run: |
+          set -euo pipefail
           test -n "${{ secrets.SERVER_HOST }}" || (echo "SERVER_HOST is empty" && exit 1)
           test -n "${{ secrets.SERVER_USER }}" || (echo "SERVER_USER is empty" && exit 1)
           test -n "${{ secrets.SERVER_SSH_KEY }}" || (echo "SERVER_SSH_KEY is empty" && exit 1)
 
       - name: Setup SSH key
         run: |
+          set -euo pipefail
           mkdir -p "$HOME/.ssh"
-          printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" > "$HOME/.ssh/id_rsa"
+          printf '%s\n' "${{ secrets.SERVER_SSH_KEY }}" | tr -d '\r' > "$HOME/.ssh/id_rsa"
           chmod 600 "$HOME/.ssh/id_rsa"
 
       - name: Add host key
         run: |
+          set -euo pipefail
           ssh-keyscan -T 10 -H "${{ secrets.SERVER_HOST }}" >> "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Create inventory
+        run: |
+          set -euo pipefail
+          cat > /tmp/inventory.ini <<EOF
+          [servers]
+          target ansible_host=${{ secrets.SERVER_HOST }} ansible_user=${{ secrets.SERVER_USER }}
+          EOF
 
       - name: Run Ansible
         run: |
+          set -euo pipefail
           ansible-playbook \
-            -i "${{ secrets.SERVER_HOST }}," \
-            -u "${{ secrets.SERVER_USER }}" \
+            -i /tmp/inventory.ini \
             --private-key "$HOME/.ssh/id_rsa" \
             ansible/install-k3s.yml
