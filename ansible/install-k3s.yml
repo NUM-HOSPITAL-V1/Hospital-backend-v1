@@ -7,14 +7,23 @@
       apt:
         update_cache: yes
 
-    - name: Install kubectl
+    - name: Install prerequisites
       apt:
-        name: kubectl
+        name:
+          - curl
+          - ca-certificates
         state: present
 
     - name: Install k3s
       shell: |
         curl -sfL https://get.k3s.io | sh -
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Verify kubectl is available
+      command: kubectl version --client
+      register: kubectl_check
+      changed_when: false
 
     - name: Install helm
       shell: |
