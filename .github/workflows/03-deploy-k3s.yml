@@ -41,13 +41,15 @@ jobs:
             printf '%s\n' "${KUBECONFIG_CONTENT}" | tr -d '\r' > "$HOME/.kube/config"
           fi
 
-          if ! kubectl --kubeconfig "$HOME/.kube/config" version --client >/dev/null 2>&1; then
-            echo "Provided KUBECONFIG is missing/invalid. Falling back to /etc/rancher/k3s/k3s.yaml"
+          # Validate by talking to API server; --client would not catch TLS/cert issues.
+          if ! kubectl --kubeconfig "$HOME/.kube/config" cluster-info >/dev/null 2>&1; then
+            echo "Provided KUBECONFIG cannot reach cluster. Falling back to /etc/rancher/k3s/k3s.yaml"
             sudo cp /etc/rancher/k3s/k3s.yaml "$HOME/.kube/config"
             sudo chown "$(id -u):$(id -g)" "$HOME/.kube/config"
           fi
 
           chmod 600 "$HOME/.kube/config"
+          echo "KUBECONFIG=$HOME/.kube/config" >> "$GITHUB_ENV"
           kubectl --kubeconfig "$HOME/.kube/config" cluster-info
 
       - name: Ensure namespace exists

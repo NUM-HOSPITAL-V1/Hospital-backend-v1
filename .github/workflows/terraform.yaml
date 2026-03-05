@@ -25,7 +25,7 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     environment: production
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -47,7 +47,8 @@ jobs:
 
   apply:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: plan
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.plan.result == 'success') || (github.event_name == 'workflow_dispatch' && needs.plan.result == 'success')
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -128,6 +129,49 @@ jobs:
           if [ -n "${worker2_instance_id}" ] && [ "${worker2_instance_id}" != "None" ]; then
             terraform import -input=false module.compute.aws_instance.worker2 "${worker2_instance_id}" || true
           fi
+
+          import_existing_ingress_rules() {
+            local sg_id="$1"
+            local desired_rules_json="$2"
+            local tf_address_prefix="$3"
+
+            if [ -z "${sg_id}" ] || [ "${sg_id}" = "None" ] || [ -z "${desired_rules_json}" ]; then
+              return 0
+            fi
+
+            local existing_rules_json
+            existing_rules_json="$(aws ec2 describe-security-group-rules \
+              --filters "Name=group-id,Values=${sg_id}" "Name=is-egress,Values=false" \
+              --query "SecurityGroupRules[]" \
+              --output json 2>/dev/null || echo "[]")"
+
+            echo "${desired_rules_json}" | jq -c 'to_entries[]' | while read -r entry; do
+              idx="$(echo "${entry}" | jq -r '.key')"
+              proto="$(echo "${entry}" | jq -r '.value.protocol')"
+              cidr="$(echo "${entry}" | jq -r '.value.cidr_ipv4')"
+              from_port="$(echo "${entry}" | jq -r '(.value.from_port // -1)')"
+              to_port="$(echo "${entry}" | jq -r '(.value.to_port // -1)')"
+
+              rule_id="$(echo "${existing_rules_json}" | jq -r \
+                --arg proto "${proto}" \
+                --arg cidr "${cidr}" \
+                --argjson from "${from_port}" \
+                --argjson to "${to_port}" \
+                '.[] | select(
+                  .IpProtocol == $proto and
+                  (.CidrIpv4 // "") == $cidr and
+                  ((.FromPort // -1) == $from) and
+                  ((.ToPort // -1) == $to)
+                ) | .SecurityGroupRuleId' | head -n1)"
+
+              if [ -n "${rule_id}" ] && [ "${rule_id}" != "null" ]; then
+                terraform import -input=false "${tf_address_prefix}[\"${idx}\"]" "${rule_id}" || true
+              fi
+            done
+          }
+
+          import_existing_ingress_rules "${control_sg_id}" "${TF_VAR_ingress_rules}" "module.security.aws_vpc_security_group_ingress_rule.control"
+          import_existing_ingress_rules "${worker_sg_id}" "${TF_VAR_worker_ingress_rules}" "module.security.aws_vpc_security_group_ingress_rule.worker"
 
       - run: terraform plan -input=false -no-color
         working-directory: terraform
