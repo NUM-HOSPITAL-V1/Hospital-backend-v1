@@ -63,6 +63,12 @@ variable "ingress_rules" {
   default = []
 }
 
+variable "manage_ingress_rules" {
+  description = "Whether Terraform manages ingress rules."
+  type        = bool
+  default     = true
+}
+
 variable "egress_rules" {
   description = "Outbound rules for the instance security group."
   type = list(object({

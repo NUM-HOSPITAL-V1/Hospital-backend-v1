@@ -29,6 +29,10 @@ variable "ingress_rules" {
   }))
 }
 
+variable "manage_ingress_rules" {
+  type = bool
+}
+
 variable "egress_rules" {
   type = list(object({
     description = optional(string)

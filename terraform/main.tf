@@ -13,6 +13,7 @@ module "security" {
   security_group_description        = var.security_group_description
   security_group_tags               = var.security_group_tags
   ingress_rules                     = var.ingress_rules
+  manage_ingress_rules              = var.manage_ingress_rules
   egress_rules                      = var.egress_rules
   worker_instance_name              = var.worker_instance_name
   worker_security_group_name        = var.worker_security_group_name
