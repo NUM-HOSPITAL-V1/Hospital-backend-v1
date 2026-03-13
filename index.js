@@ -52,7 +52,7 @@ mongoose
   .then(() => console.log("MongoDB Connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
-app.get("/", (req, res) =>
+app.get("/api/status", (req, res) =>
   res.send("OK"));
 
 app.use("/api/auth", AuthRouter);
