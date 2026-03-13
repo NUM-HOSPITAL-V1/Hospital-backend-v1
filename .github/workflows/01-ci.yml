@@ -4,13 +4,8 @@ run-name: "CI | ${{ github.event_name }} | ${{ github.ref_name }}"
 on:
   push:
     branches: [ main ]
-    paths-ignore:
-      - "terraform/**"
-      - ".github/workflows/terraform.yaml"
   pull_request:
-    paths-ignore:
-      - "terraform/**"
-      - ".github/workflows/terraform.yaml"
+    
 
 jobs:
   test:
